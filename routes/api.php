@@ -55,23 +55,17 @@ Route::get('/tasks/{id}', function ($id) {
 });
 
 // POST /tasks - create a task
-Route::post('/tasks', function (Request $request) use ($defaultTasks) {
+Route::post('/tasks', function (Request $request) {
     $title = $request->input('title');
 
     if (!is_string($title) || trim($title) === '') {
         return response()->json(['error' => 'Title is required'], 400);
     }
 
-    $tasks = Cache::store('file')->get('tasks', $defaultTasks);
-
-    $task = [
-        'id' => empty($tasks) ? 1 : max(array_column($tasks, 'id')) + 1,
+    $task = Task::create([
         'title' => trim($title),
         'done' => false,
-    ];
-
-    $tasks[] = $task;
-    Cache::store('file')->forever('tasks', $tasks);
+    ]);
 
     return response()->json($task, 201);
 });

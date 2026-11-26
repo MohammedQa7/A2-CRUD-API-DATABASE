@@ -71,62 +71,39 @@ Route::post('/tasks', function (Request $request) {
 });
 
 
-// PUT /tasks/{id} - update title and/or done
-Route::put('/tasks/{id}', function (Request $request, string $id) use ($defaultTasks) {
-    $tasks = Cache::store('file')->get('tasks', $defaultTasks);
+// PUT /tasks/{id} - update a task
+Route::put('/tasks/{id}', function (Request $request, $id) {
+    $task = Task::find($id);
 
-    $index = collect($tasks)->search(fn($task) => (string) $task['id'] === $id);
-
-    // Use === false, because index 0 is a valid result
-    if ($index === false) {
-        return response()->json(['error' => "Task {$id} not found"], 404);
+    if (!$task) {
+        return response()->json(['error' => 'Task not found'], 404);
     }
 
-    $data = $request->json()->all();
+    $data = collect($request->json()->all())
+        ->only(['title', 'done'])
+        ->all();
 
-    if (!array_key_exists('title', $data) && !array_key_exists('done', $data)) {
-        return response()->json([
-            'error' => 'Send a JSON body with title and/or done',
-        ], 400);
+    if (
+        empty($data) ||
+        (array_key_exists('title', $data) && (!is_string($data['title']) || trim($data['title']) === '')) ||
+        (array_key_exists('done', $data) && !is_bool($data['done']))
+    ) {
+        return response()->json(['error' => 'Invalid body'], 400);
     }
 
-    if (array_key_exists('title', $data)) {
-        if (!is_string($data['title']) || trim($data['title']) === '') {
-            return response()->json([
-                'error' => 'Title must be a non-empty string',
-            ], 400);
-        }
+    $task->update($data);
 
-        $tasks[$index]['title'] = trim($data['title']);
-    }
-
-    if (array_key_exists('done', $data)) {
-        if (!is_bool($data['done'])) {
-            return response()->json(['error' => 'Done must be true or false'], 400);
-        }
-
-        $tasks[$index]['done'] = $data['done'];
-    }
-
-    // Save only after all validation has passed
-    Cache::store('file')->forever('tasks', $tasks);
-
-    return response()->json($tasks[$index]);
+    return response()->json($task);
 });
-
 // DELETE /tasks/{id} - remove a task
-Route::delete('/tasks/{id}', function (string $id) use ($defaultTasks) {
-    $tasks = Cache::store('file')->get('tasks', $defaultTasks);
+Route::delete('/tasks/{id}', function (string $id) {
+    $task = Task::find($id);
 
-    $index = collect($tasks)->search(fn($task) => (string) $task['id'] === $id);
-
-    if ($index === false) {
-        return response()->json(['error' => "Task {$id} not found"], 404);
+    if (!$task) {
+        return response()->json(['error' => 'Task not found'], 404);
     }
 
-    // Remove the task and reindex, so GET /tasks still returns a JSON array
-    array_splice($tasks, $index, 1);
-    Cache::store('file')->forever('tasks', $tasks);
+    $task->delete();
 
     return response()->noContent(); // 204
 });

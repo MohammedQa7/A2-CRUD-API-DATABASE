@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Task;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
@@ -37,21 +38,17 @@ Route::get('/health', function () {
 // ---------------------------------------
 
 // GET /tasks - return all tasks
-Route::get('/tasks', function () use ($defaultTasks) {
-    $tasks = Cache::store('file')->get('tasks', $defaultTasks);
-
-    return response()->json($tasks);
+Route::get('/tasks', function () {
+    return response()->json(Task::all());
 });
 
 // GET /tasks/{id} - return one task
-Route::get('/tasks/{id}', function (string $id) use ($defaultTasks) {
-    $tasks = Cache::store('file')->get('tasks', $defaultTasks);
-
-    // Compare as strings, so "1abc" doesn't match task 1
-    $task = collect($tasks)->first(fn($task) => (string) $task['id'] === $id);
+Route::get('/tasks/{id}', function ($id) {
+    // Only query for whole numbers, so "1abc" can't match task 1
+    $task = Task::find($id);
 
     if (!$task) {
-        return response()->json(['error' => "Task {$id} not found"], 404);
+        return response()->json(['error' => 'Task not found'], 404);
     }
 
     return response()->json($task);
